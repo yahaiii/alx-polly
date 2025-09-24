@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,8 +10,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { deletePoll } from "@/app/lib/actions/poll-actions";
-import { createClient } from "@/lib/supabase/client";
+import { getAllPolls, adminDeletePoll, getUserStats } from "@/app/lib/actions/admin-actions";
+import { useAuth } from "@/app/lib/context/auth-context";
+import { toast } from "sonner";
 
 interface Poll {
   id: string;
@@ -20,42 +22,79 @@ interface Poll {
   options: string[];
 }
 
+interface Stats {
+  totalPolls: number;
+  totalVotes: number;
+}
+
 export default function AdminPage() {
   const [polls, setPolls] = useState<Poll[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    fetchAllPolls();
-  }, []);
-
-  const fetchAllPolls = async () => {
-    const supabase = createClient();
-
-    const { data, error } = await supabase
-      .from("polls")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setPolls(data);
+    if (!authLoading && !user) {
+      router.push("/login");
+      return;
     }
-    setLoading(false);
+
+    if (user) {
+      checkAdminAccess();
+    }
+  }, [user, authLoading, router]);
+
+  const checkAdminAccess = async () => {
+    try {
+      const [pollsResult, statsResult] = await Promise.all([
+        getAllPolls(),
+        getUserStats()
+      ]);
+
+      if (pollsResult.error) {
+        toast.error("Unauthorized access to admin panel");
+        router.push("/polls");
+        return;
+      }
+
+      setPolls(pollsResult.polls || []);
+      setStats(statsResult.stats);
+      setIsAuthorized(true);
+    } catch (error) {
+      toast.error("Failed to load admin data");
+      router.push("/polls");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (pollId: string) => {
-    setDeleteLoading(pollId);
-    const result = await deletePoll(pollId);
+    if (!confirm("Are you sure you want to delete this poll?")) {
+      return;
+    }
 
-    if (!result.error) {
+    setDeleteLoading(pollId);
+    const result = await adminDeletePoll(pollId);
+
+    if (result.error) {
+      toast.error(result.error);
+    } else {
       setPolls(polls.filter((poll) => poll.id !== pollId));
+      toast.success("Poll deleted successfully");
     }
 
     setDeleteLoading(null);
   };
 
-  if (loading) {
-    return <div className="p-6">Loading all polls...</div>;
+  if (authLoading || loading) {
+    return <div className="p-6">Loading admin panel...</div>;
+  }
+
+  if (!isAuthorized) {
+    return <div className="p-6">Unauthorized access</div>;
   }
 
   return (
@@ -66,6 +105,27 @@ export default function AdminPage() {
           View and manage all polls in the system.
         </p>
       </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Polls</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{stats.totalPolls}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Votes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-bold">{stats.totalVotes}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid gap-4">
         {polls.map((poll) => (

@@ -12,7 +12,11 @@ export async function login(data: LoginFormData) {
   });
 
   if (error) {
-    return { error: error.message };
+    // Don't expose detailed error messages for security
+    if (error.message.includes('Invalid login credentials')) {
+      return { error: 'Invalid email or password' };
+    }
+    return { error: 'Login failed. Please try again.' };
   }
 
   // Success: no error
@@ -21,6 +25,15 @@ export async function login(data: LoginFormData) {
 
 export async function register(data: RegisterFormData) {
   const supabase = await createClient();
+
+  // Basic validation
+  if (!data.email || !data.password || !data.name) {
+    return { error: 'All fields are required' };
+  }
+
+  if (data.password.length < 6) {
+    return { error: 'Password must be at least 6 characters long' };
+  }
 
   const { error } = await supabase.auth.signUp({
     email: data.email,
@@ -33,7 +46,14 @@ export async function register(data: RegisterFormData) {
   });
 
   if (error) {
-    return { error: error.message };
+    // Handle specific error cases without exposing internal details
+    if (error.message.includes('already registered')) {
+      return { error: 'An account with this email already exists' };
+    }
+    if (error.message.includes('Invalid email')) {
+      return { error: 'Please enter a valid email address' };
+    }
+    return { error: 'Registration failed. Please try again.' };
   }
 
   // Success: no error
@@ -44,7 +64,7 @@ export async function logout() {
   const supabase = await createClient();
   const { error } = await supabase.auth.signOut();
   if (error) {
-    return { error: error.message };
+    return { error: 'Logout failed. Please try again.' };
   }
   return { error: null };
 }

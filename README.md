@@ -81,7 +81,28 @@ npm install
 
 ### 3. Environment Variables
 
-The project uses Supabase for its backend. An environment file `.env.local` is needed.Use the keys you created during the Supabase setup process.
+The project uses Supabase for its backend. You need to create a `.env.local` file with your Supabase credentials:
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env.local
+   ```
+
+2. Sign up for a free Supabase account at [supabase.io](https://supabase.io)
+
+3. Create a new project in Supabase
+
+4. Go to your project settings > API to find your:
+   - Project URL
+   - Public anon key
+
+5. Update `.env.local` with your actual Supabase credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+   ```
+
+**Note**: The application will not work without valid Supabase credentials.
 
 ### 4. Running the Development Server
 
